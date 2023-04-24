@@ -14,6 +14,19 @@ const Status QU_Insert(const string & relation,
 	const int attrCnt, 
 	const attrInfo attrList[])
 {
+	int attributeCounter;
+	AttrDesc *attributeDescPtr;
+	// use attrCat->getRelInfo to get the attributes in order and their descriptions
+
+	Status status = attrCat->getRelInfo(relation, attributeCounter, attributeDescPtr);
+	if (status != OK){
+		return status;
+	}
+	// if the parameter attrCnt is wrong
+	if (attributeCounter != attrCnt){
+		return UNIXERR;
+	}
+	
 // part 6
 return OK;
 
