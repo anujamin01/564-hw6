@@ -26,7 +26,78 @@ const Status QU_Insert(const string & relation,
 	if (attributeCounter != attrCnt){
 		return UNIXERR;
 	}
+
+	// grab total length of what to insert
+	int relLen = 0;
+	for(int i = 0; i < attrCnt; i++){
+		relLen += attributeDescPtr[i].attrLen;
+	}
 	
+	InsertFileScan ifs(relation, status);
+	if (status != OK){
+		return status;
+	}
+
+	char *insertInfo;
+	if (!(insertInfo = new char[relLen])){
+		return INSUFMEM;
+	}
+
+	int offset = 0;
+	int val = 0;
+	float fval = 0;
+	bool attrFound = false;
+	// add all the attribute info to our buffer in order
+	int i = 0;
+	while (i < attrCnt){
+		attrFound = false;
+		for (int j = 0; j < attrCnt; j++){
+			// found matching attribute
+			if(strcmp(attributeDescPtr[i].attrName,attributeDescPtr[j].attrName) == 0){
+				offset = attributeDescPtr[i].attrOffset;
+				if (attrList[j].attrType == STRING){
+					memcpy((char *)insertInfo + offset, (char *)attrList[j].attrValue, attributeDescPtr[i].attrLen);
+					break;
+				} else if(attrList[j].attrType == INTEGER){
+					val = atoi((char *)attrList[j].attrValue);
+					memcpy((char *)insertInfo + offset, &val, attributeDescPtr[i].attrLen);
+					break;
+
+				} else if(attrList[j].attrType == FLOAT){
+					fval = atof((char *)attrList[j].attrValue);
+					memcpy((char *)insertInfo + offset, &fval, attributeDescPtr[i].attrLen);
+					break;
+				} else{
+					// some random type
+					return UNIXERR;
+				}
+				attrFound = true;
+				break;
+				// insert different types of data
+			}
+		}
+		// error couldn't find a matching attribute
+		if (!attrFound){
+			delete [] insertInfo;
+			free(attributeDescPtr);
+			return UNIXERR;
+		}
+		i+=1;
+	}
+	// do the insertion
+	Record r;
+	r.data = (void *) insertInfo;
+	r.length = relLen;
+
+	RID insertRID;
+	status = ifs.insertRecord(r,insertRID);
+	if (status != OK){
+		return status;
+	}
+
+	// free some stuff up
+	delete [] insertInfo;
+	free(attributeDescPtr);
 // part 6
 return OK;
 
