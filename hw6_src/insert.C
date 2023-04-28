@@ -57,16 +57,13 @@ const Status QU_Insert(const string & relation,
 				offset = attributeDescPtr[i].attrOffset;
 				if (attrList[j].attrType == STRING){
 					memcpy((char *)insertInfo + offset, (char *)attrList[j].attrValue, attributeDescPtr[i].attrLen);
-					break;
 				} else if(attrList[j].attrType == INTEGER){
 					val = atoi((char *)attrList[j].attrValue);
 					memcpy((char *)insertInfo + offset, &val, attributeDescPtr[i].attrLen);
-					break;
 
 				} else if(attrList[j].attrType == FLOAT){
 					fval = atof((char *)attrList[j].attrValue);
 					memcpy((char *)insertInfo + offset, &fval, attributeDescPtr[i].attrLen);
-					break;
 				} else{
 					// some random type
 					return UNIXERR;
