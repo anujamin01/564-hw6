@@ -55,7 +55,7 @@ const Status QU_Insert(const string &relation,
 	for (int i = 0; i < attrCnt; i++)
 	{
 		bool attrFound = false;
-		for (int j = 0; j < attrCnt; j++)
+		for (int j = 0; j < attributeCounter; j++)
 		{
 			// found matching attribute
 			if (strcmp(attributeDescPtr[i].attrName, attrList[j].attrName) == 0)
