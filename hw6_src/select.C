@@ -34,9 +34,8 @@ const Status QU_Select(const string &result,
 	AttrDesc descs[projCnt];
 
 	// get the needed information for each projection
-	int i = 0;
 	int len = 0;
-	while (i < projCnt)
+	for (int i = 0; i < projCnt; i++)
 	{
 		// fills up descriptions of all projections
 		status = attrCat->getInfo(projNames[i].relName, projNames[i].attrName, descs[i]);
@@ -44,10 +43,11 @@ const Status QU_Select(const string &result,
 		{
 			return status;
 		}
-		i++;
 		len += descs[i].attrLen;
 	}
 	AttrDesc *attrPtr = NULL;
+	const char *filterType;
+
 	// SELECT ALL condition
 	if (attr != NULL)
 	{
@@ -58,10 +58,28 @@ const Status QU_Select(const string &result,
 		{
 			return status;
 		}
+
+		// type conversion to pass in attrType parameter for scan select function
+		int val;
+		float fval;
+		if (attr->attrType == STRING)
+		{
+			filterType = attrValue;
+		}
+		else if (attr->attrType == INTEGER)
+		{
+			val = atoi(attrValue);
+			filterType = (char *)&val;
+		}
+		else if (attr->attrType == FLOAT)
+		{
+			fval = atof(attrValue);
+			filterType = (char *)&fval;
+		}
 	}
 
 	// scanselect given all the relevant data
-	status = ScanSelect(result, projCnt, descs, attrPtr, op, attrValue, len);
+	status = ScanSelect(result, projCnt, descs, attrPtr, op, filterType, len);
 	return status;
 }
 
@@ -78,9 +96,10 @@ const Status ScanSelect(const string &result,
 	Record r;
 	RID rid;
 	Status status;
+	// start a new hfs
 	HeapFileScan *hfs = new HeapFileScan(projNames[0].relName, status);
 
-	// couldn't start scan
+	// if we couldn't start scan
 	if (status != OK)
 	{
 		delete hfs;
@@ -89,6 +108,7 @@ const Status ScanSelect(const string &result,
 	// no metadata to work with start empty scan
 	if (attrDesc == NULL)
 	{
+		// start scan with default null values
 		status = hfs->startScan(0, 0, STRING, NULL, EQ);
 		if (status != OK)
 		{
@@ -98,24 +118,9 @@ const Status ScanSelect(const string &result,
 	}
 	else
 	{
-		// start scan
-		int val;
-		float fval;
+		// start scan with attrDesc
+		status = hfs->startScan(attrDesc->attrOffset, attrDesc->attrLen, (Datatype)attrDesc->attrType, filter, op);
 
-		if (attrDesc->attrType == STRING)
-		{
-			status = hfs->startScan(attrDesc->attrOffset, attrDesc->attrLen, (Datatype)attrDesc->attrType, filter, op);
-		}
-		else if (attrDesc->attrType == INTEGER)
-		{
-			val = atoi(filter);
-			status = hfs->startScan(attrDesc->attrOffset, attrDesc->attrLen, (Datatype)attrDesc->attrType, (char *)&val, op);
-		}
-		else if (attrDesc->attrType == FLOAT)
-		{
-			fval = atof(filter);
-			status = hfs->startScan(attrDesc->attrOffset, attrDesc->attrLen, (Datatype)attrDesc->attrType, (char *)&fval, op);
-		}
 		if (status != OK)
 		{
 			delete hfs;
@@ -125,19 +130,20 @@ const Status ScanSelect(const string &result,
 
 	while ((status = hfs->scanNext(rid)) == OK)
 	{
+		// get record and populate into r,
 		status = hfs->getRecord(r);
 		if (status != OK)
 		{
 			break;
 		}
+		// found a match
 		attrInfo attrs[projCnt];
-
 		for (int i = 0; i < projCnt; i++)
 		{
 			// grab metadata for current projection
 			AttrDesc tempAttrDesc = projNames[i];
 
-			// Use memcpy to copy each attribute in the record into a list of attrInfo objects. 
+			// Use memcpy to copy each attribute in the record into a list of attrInfo objects.
 			strcpy(attrs[i].relName, tempAttrDesc.relName);
 			strcpy(attrs[i].attrName, tempAttrDesc.attrName);
 			attrs[i].attrType = tempAttrDesc.attrType;
@@ -147,8 +153,8 @@ const Status ScanSelect(const string &result,
 
 			int val;
 			float fval;
-			
-			// copy the actual attribute value into attrs.attrValue
+
+			// copy the ACTUAL attribute value into attrs.attrValue
 			if (attrs[i].attrType == STRING)
 			{
 				memcpy((char *)attrs[i].attrValue, (char *)(r.data + tempAttrDesc.attrOffset), tempAttrDesc.attrLen);
@@ -156,17 +162,17 @@ const Status ScanSelect(const string &result,
 			else if (attrs[i].attrType == INTEGER)
 			{
 				memcpy(&val, (int *)(r.data + tempAttrDesc.attrOffset), tempAttrDesc.attrLen);
-				// put that int value into the attrValue 
+				// put that int value into the attrValue
 				sprintf((char *)attrs[i].attrValue, "%d", val);
 			}
 			else if (attrs[i].attrType == FLOAT)
 			{
 				memcpy(&fval, (float *)(r.data + tempAttrDesc.attrOffset), tempAttrDesc.attrLen);
-				// put that float value into the attrValue 
+				// put that float value into the attrValue
 				sprintf((char *)attrs[i].attrValue, "%f", fval);
 			}
 		}
-		// call QU_Insert to insert the record into the temporary table or the table specified by the user 
+		// call QU_Insert to insert the record into the temporary table or the table specified by the user
 		status = QU_Insert(result, projCnt, attrs);
 		if (status != OK)
 		{
