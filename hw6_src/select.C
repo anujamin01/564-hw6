@@ -35,15 +35,17 @@ const Status QU_Select(const string &result,
 
 	// get the needed information for each projection
 	int len = 0;
-	for (int i = 0; i < projCnt; i++)
+	int i = 0;
+
+	while (i < projCnt)
 	{
 		// fills up descriptions of all projections
-		status = attrCat->getInfo(projNames[i].relName, projNames[i].attrName, descs[i]);
-		if (status != OK)
+		if (attrCat->getInfo(projNames[i].relName, projNames[i].attrName, descs[i]) != OK)
 		{
-			return status;
+			return attrCat->getInfo(projNames[i].relName, projNames[i].attrName, descs[i]);
 		}
 		len += descs[i].attrLen;
+		i++;
 	}
 	AttrDesc *attrPtr = NULL;
 	const char *filterType;
@@ -53,10 +55,9 @@ const Status QU_Select(const string &result,
 	{
 		attrPtr = new AttrDesc;
 		// fill up attrPtr to be passed into scanselect
-		status = attrCat->getInfo(attr->relName, attr->attrName, *attrPtr);
-		if (status != OK)
+		if (attrCat->getInfo(attr->relName, attr->attrName, *attrPtr) != OK)
 		{
-			return status;
+			return attrCat->getInfo(attr->relName, attr->attrName, *attrPtr);
 		}
 
 		// type conversion to pass in attrType parameter for scan select function
@@ -79,8 +80,7 @@ const Status QU_Select(const string &result,
 	}
 
 	// scanselect given all the relevant data
-	status = ScanSelect(result, projCnt, descs, attrPtr, op, filterType, len);
-	return status;
+	return ScanSelect(result, projCnt, descs, attrPtr, op, filterType, len);
 }
 
 const Status ScanSelect(const string &result,
@@ -109,36 +109,33 @@ const Status ScanSelect(const string &result,
 	if (attrDesc == NULL)
 	{
 		// start scan with default null values
-		status = hfs->startScan(0, 0, STRING, NULL, EQ);
-		if (status != OK)
+		if (hfs->startScan(0, 0, STRING, NULL, EQ) != OK)
 		{
 			delete hfs;
-			return status;
+			return hfs->startScan(0, 0, STRING, NULL, EQ);
 		}
 	}
 	else
 	{
 		// start scan with attrDesc
-		status = hfs->startScan(attrDesc->attrOffset, attrDesc->attrLen, (Datatype)attrDesc->attrType, filter, op);
-
-		if (status != OK)
+		if (hfs->startScan(attrDesc->attrOffset, attrDesc->attrLen, (Datatype)attrDesc->attrType, filter, op) != OK)
 		{
 			delete hfs;
-			return status;
+			return hfs->startScan(attrDesc->attrOffset, attrDesc->attrLen, (Datatype)attrDesc->attrType, filter, op);
 		}
 	}
 
-	while ((status = hfs->scanNext(rid)) == OK)
+	while (hfs->scanNext(rid) == OK)
 	{
 		// get record and populate into r,
-		status = hfs->getRecord(r);
-		if (status != OK)
+		if (hfs->getRecord(r) != OK)
 		{
 			break;
 		}
 		// found a match
 		attrInfo attrs[projCnt];
-		for (int i = 0; i < projCnt; i++)
+		int i = 0;
+		while (i < projCnt)
 		{
 			// grab metadata for current projection
 			AttrDesc tempAttrDesc = projNames[i];
@@ -171,13 +168,13 @@ const Status ScanSelect(const string &result,
 				// put that float value into the attrValue
 				sprintf((char *)attrs[i].attrValue, "%f", fval);
 			}
+			i++;
 		}
 		// call QU_Insert to insert the record into the temporary table or the table specified by the user
-		status = QU_Insert(result, projCnt, attrs);
-		if (status != OK)
+		if (QU_Insert(result, projCnt, attrs) != OK)
 		{
 			delete hfs;
-			return status;
+			return  QU_Insert(result, projCnt, attrs);
 		}
 	}
 

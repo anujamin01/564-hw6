@@ -28,8 +28,6 @@ const Status QU_Delete(const string &relation,
 	// get description of attribute info
 	attrCat->getInfo(relation, attrName, desc);
 
-	int offset = desc.attrOffset;
-	int len = desc.attrLen;
 	int val;
 	float fval;
 	// start scan
@@ -40,36 +38,30 @@ const Status QU_Delete(const string &relation,
 	}
 	else if (type == STRING)
 	{
-		status = hfs->startScan(offset, len, type, attrValue, op);
+		status = hfs->startScan(desc.attrOffset, desc.attrLen, type, attrValue, op);
 	}
 	else if (type == INTEGER)
 	{
 		val = atoi(attrValue);
-		status = hfs->startScan(offset, len, type, (char *)&val, op);
+		status = hfs->startScan(desc.attrOffset, desc.attrLen, type, (char *)&val, op);
 	}
 	else if (type == FLOAT)
 	{
 		fval = atof(attrValue);
-		status = hfs->startScan(offset, len, type, (char *)&fval, op);
+		status = hfs->startScan(desc.attrOffset, desc.attrLen, type, (char *)&fval, op);
 	}
 
-	if (status != OK)
-	{
-		delete hfs;
-		return status;
-	}
 
 	// scanNext and try to delete the record
-	while ((status = hfs->scanNext(rid)) == OK)
+	while (hfs->scanNext(rid) == OK)
 	{
-		if ((status = hfs->deleteRecord()) != OK)
+		if (hfs->deleteRecord() != OK)
 			//	delete hfs;
-			return status;
+			return hfs->deleteRecord();
 	}
 	// finished scan
 	hfs->endScan();
 	delete hfs;
 
-	// part 6
 	return OK;
 }

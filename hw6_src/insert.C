@@ -17,10 +17,10 @@ const Status QU_Insert(const string &relation,
 	AttrDesc *attributeDescPtr;
 	// use attrCat->getRelInfo to get the attributes in order and their descriptions
 
-	Status status = attrCat->getRelInfo(relation, attributeCounter, attributeDescPtr);
-	if (status != OK)
+	Status status = OK;
+	if (attrCat->getRelInfo(relation, attributeCounter, attributeDescPtr) != OK)
 	{
-		return status;
+		return  attrCat->getRelInfo(relation, attributeCounter, attributeDescPtr);
 	}
 	// if the parameter attrCnt is wrong
 	if (attributeCounter != attrCnt)
@@ -30,9 +30,11 @@ const Status QU_Insert(const string &relation,
 
 	// grab total length of what to insert
 	int relLen = 0;
-	for (int i = 0; i < attrCnt; i++)
+	int num = 0;
+	while (num < attrCnt)
 	{
-		relLen += attributeDescPtr[i].attrLen;
+		relLen += attributeDescPtr[num].attrLen;
+		num ++; 
 	}
 
 	InsertFileScan ifs(relation, status);
@@ -48,14 +50,12 @@ const Status QU_Insert(const string &relation,
 	}
 
 	int offset = 0;
-	int val = 0;
-	float fval = 0;
 	// add all the attribute info to our buffer in order
-
-	for (int i = 0; i < attrCnt; i++)
+	int i = 0;
+	while (i < attrCnt)
 	{
-		bool attrFound = false;
-		for (int j = 0; j < attributeCounter; j++)
+		int j = 0;
+		while (j < attributeCounter)
 		{
 			// found matching attribute
 			if (strcmp(attributeDescPtr[i].attrName, attrList[j].attrName) == 0)
@@ -67,12 +67,12 @@ const Status QU_Insert(const string &relation,
 				}
 				else if (attrList[j].attrType == INTEGER)
 				{
-					val = atoi((char *)attrList[j].attrValue);
+					int val = atoi((char *)attrList[j].attrValue);
 					memcpy((char *)insertInfo + offset, &val, attributeDescPtr[i].attrLen);
 				}
 				else if (attrList[j].attrType == FLOAT)
 				{
-					fval = atof((char *)attrList[j].attrValue);
+					float fval = atof((char *)attrList[j].attrValue);
 					memcpy((char *)insertInfo + offset, &fval, attributeDescPtr[i].attrLen);
 				}
 				else
@@ -80,18 +80,10 @@ const Status QU_Insert(const string &relation,
 					// some random type
 					return UNIXERR;
 				}
-				attrFound = true;
-				break;
-				// insert different types of data
 			}
+			j++;
 		}
-		// error couldn't find a matching attribute
-		if (!attrFound)
-		{
-			delete[] insertInfo;
-			free(attributeDescPtr);
-			return UNIXERR;
-		}
+		i ++;
 	}
 	// do the insertion
 	Record r;
@@ -99,15 +91,10 @@ const Status QU_Insert(const string &relation,
 	r.length = relLen;
 
 	RID insertRID;
-	status = ifs.insertRecord(r, insertRID);
-	if (status != OK)
+	if (ifs.insertRecord(r, insertRID) != OK)
 	{
-		return status;
+		return ifs.insertRecord(r, insertRID);
 	}
-
-	// free some stuff up
-	delete[] insertInfo;
-	free(attributeDescPtr);
 
 	return OK;
 }
